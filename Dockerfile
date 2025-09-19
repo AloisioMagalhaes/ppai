@@ -110,7 +110,7 @@ RUN python3.12 -m venv env && \
     torch==2.8.0+cu126 \
     torchaudio==2.8.0+cu126 \
     torchvision==0.23.0+cu126 \
-    --index-url https://download.pytorch.org/whl/cu126
+     --extra-index-url https://download.pytorch.org/whl/cu126
 
 # Define a porta que o container vai expor
 COPY . .
