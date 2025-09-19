@@ -1,5 +1,5 @@
 # Usa a imagem base da Hugging Face
-FROM registry.hf.space/cpuai-partpacker:latest
+FROM FROM python:3.12-slim
 
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
@@ -7,8 +7,8 @@ WORKDIR /app
 # Cria um ambiente virtual e instala todas as dependências do projeto nele
 # O pacote "Brotli" foi removido pois estava causando o erro de "no matching distribution"
 # O uso de 'line continuation' (\) torna o comando mais legível
-RUN python3.10 -m venv env && \
-    /app/env/bin/python3.10 -m pip install --no-cache-dir \
+RUN python3.12 -m venv env && \
+    /app/env/bin/python3.12 -m pip install --no-cache-dir \
     aiofiles==24.1.0 \
     annotated-types==0.7.0 \
     anyio==4.10.0 \
@@ -113,7 +113,8 @@ RUN python3.10 -m venv env && \
     --index-url https://download.pytorch.org/whl/cu126
 
 # Define a porta que o container vai expor
+COPY . .
 EXPOSE 7860
 
 # Comando para iniciar a aplicação a partir do ambiente virtual
-CMD ["/app/env/bin/python3.10", "app.py"]
+CMD ["python", "app.py"]
