@@ -46,7 +46,7 @@ RUN python3.12 -m pip install --no-cache-dir \
     MarkupSafe==3.0.2 \
     mdurl==0.1.2 \
     mpmath==1.3.0 \
-    msvc_runtime==14.44.35112 \
+    #msvc_runtime==14.44.35112 \
     networkx==3.5 \
     ninja==1.13.0 \
     numba==0.62.0 \
