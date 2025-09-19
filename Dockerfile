@@ -7,8 +7,7 @@ WORKDIR /app
 # Cria um ambiente virtual e instala todas as dependências do projeto nele
 # O pacote "Brotli" foi removido pois estava causando o erro de "no matching distribution"
 # O uso de 'line continuation' (\) torna o comando mais legível
-RUN python3.12 -m venv env && \
-    /app/env/bin/python3.12 -m pip install --no-cache-dir \
+RUN python3.12 -m pip install --no-cache-dir \
     aiofiles==24.1.0 \
     annotated-types==0.7.0 \
     anyio==4.10.0 \
