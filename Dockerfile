@@ -3,11 +3,14 @@ FROM python:3.12-slim
 
 # Install the necessary dependencies, including libgl1
 RUN apt-get update && apt-get install -y \
-    libgl1 \
-    # Add other dependencies like libsm6 and libxrender1 if needed
+    libglib2.0-0 \
+    # Other common dependencies for OpenCV
     libsm6 \
     libxrender1 \
-    # Clean up the package manager cache to reduce image size
+    libfontconfig1 \
+    libice6 \
+    libgtk2.0-0 \
+    # Clean up the cache to reduce image size
     && rm -rf /var/lib/apt/lists/*
 # Define o diretório de trabalho dentro do container
 WORKDIR /app
