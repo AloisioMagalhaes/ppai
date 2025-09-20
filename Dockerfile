@@ -1,128 +1,62 @@
-# get the development image from nvidia cuda 12.4 (using devel for full CUDA toolkit)
-FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+# Use uma imagem de base mais limpa e específica
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
 
 LABEL name="partpacker" maintainer="partpacker"
 
-# create workspace folder and set it as working directory
-RUN mkdir -p /workspace
-WORKDIR /workspace
+# Define o locale para evitar warnings.
+ENV LANG=C.UTF-8
 
-# update package lists and install essential packages
-RUN apt-get update && apt-get install -y \
-    build-essential \
+# Atualiza listas de pacotes e instala todas as dependências do sistema em uma única camada.
+# Isso inclui bibliotecas de gráficos (libgl, libegl), GTK/GLib (libglib2.0-0, libsm6),
+# e ferramentas de build (git, wget, build-essential).
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+    python3-pip \
+    python3-dev \
     git \
     wget \
-    vim \
-    libegl1-mesa-dev \
+    build-essential \
     libglib2.0-0 \
-    unzip \
-    git-lfs \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install additional graphics and rendering dependencies
-RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    pkg-config \
-    libglvnd0 \
-    libgl1 \
-    libglx0 \
-    libegl1 \
-    libgles2 \
-    libglvnd-dev \
-    libgl1-mesa-dev \
-    libegl1-mesa-dev \
-    libgles2-mesa-dev \
-    cmake \
-    mesa-utils-extra \
+    libsm6 \
     libxrender1 \
+    libgl1 \
+    libgles2 \
+    libegl1 \
+    libxext6 \
+    libxrender-dev \
     libxi6 \
     libgconf-2-4 \
     libxkbcommon-x11-0 \
-    libsm6 \
-    libxext6 \
-    libxrender-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
-ENV PYOPENGL_PLATFORM=egl
-
-# Set CUDA environment variables
-ENV CUDA_HOME=/usr/local/cuda
-ENV PATH=${CUDA_HOME}/bin:${PATH}
-ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
-ENV TORCH_CUDA_ARCH_LIST="6.0;6.1;7.0;7.5;8.0;8.6;8.9;9.0"
-
-# install conda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh && \
-    chmod +x Miniconda3-latest-Linux-x86_64.sh && \
-    ./Miniconda3-latest-Linux-x86_64.sh -b -p /workspace/miniconda3 && \
-    rm Miniconda3-latest-Linux-x86_64.sh
-
-# update PATH environment variable
-ENV PATH="/workspace/miniconda3/bin:${PATH}"
-
-# initialize conda
-RUN conda init bash
-
-# create and activate conda environment
-RUN conda create -n partpacker python=3.10 && echo "source activate partpacker" > ~/.bashrc
-ENV PATH="/workspace/miniconda3/envs/partpacker/bin:${PATH}"
-
-# Set conda to always auto-approve
-RUN conda config --set always_yes true
-
-# Install essential conda packages
-RUN conda install Ninja
-RUN conda install cuda -c nvidia/label/cuda-12.4.1 -y
-
-# Update libstdcxx-ng to fix compatibility issues
-RUN conda install -c conda-forge libstdcxx-ng -y
-
-# Install PyTorch with CUDA support
-RUN pip install torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124
-
-# Clone PartPacker repository
-RUN git clone https://github.com/NVlabs/PartPacker.git
-
-# Set working directory to the cloned repository
+# Cria o diretório de trabalho.
 WORKDIR /workspace/PartPacker
 
-# Clean up requirements.txt to remove invalid pip options
-RUN sed -i 's/ --no-build-isolation//g' requirements.txt && \
-    sed -i 's/--no-build-isolation//g' requirements.txt
+# Clona o repositório antes de instalar as dependências Python
+# para que o requirements.txt esteja disponível.
+RUN git clone https://github.com/NVlabs/PartPacker.git .
 
-# Install Python dependencies
-RUN pip install -r requirements.txt
+# Limpa o arquivo de requisitos para evitar erros com pip
+RUN sed -i 's/ --no-build-isolation//g' requirements.txt
 
-# Install transformers
-RUN pip install transformers
+# Instala as dependências Python e outras bibliotecas de forma otimizada.
+# O torch é instalado com a URL correta e sem Conda.
+RUN pip install --no-cache-dir \
+    torch==2.5.1 torchvision==0.20.1 torchaudio==2.5.1 --index-url https://download.pytorch.org/whl/cu124 \
+    && pip install --no-cache-dir \
+    -r requirements.txt \
+    transformers \
+    # Remove as dependências de build após a instalação
+    && apt-get purge -y --auto-remove build-essential python3-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Modify app.py to enable share=True for Gradio
+# Cria o diretório para modelos e baixa os arquivos.
+RUN mkdir -p pretrained && \
+    wget -P pretrained https://huggingface.co/nvidia/PartPacker/resolve/main/vae.pt && \
+    wget -P pretrained https://huggingface.co/nvidia/PartPacker/resolve/main/flow.pt
+
+# Modifica o arquivo app.py para habilitar o modo de compartilhamento
 RUN sed -i 's/block\.launch()/block.launch(share=True)/g' app.py
 
-# Create pretrained models directory and download models
-RUN mkdir -p pretrained && \
-    cd pretrained && \
-    wget https://huggingface.co/nvidia/PartPacker/resolve/main/vae.pt && \
-    wget https://huggingface.co/nvidia/PartPacker/resolve/main/flow.pt
-
-# Set global library paths to ensure proper linking at runtime
-ENV LD_LIBRARY_PATH="/workspace/miniconda3/envs/partpacker/lib:${LD_LIBRARY_PATH}"
-
-# Activate conda environment by default
-RUN echo "conda activate partpacker" >> ~/.bashrc
-SHELL ["/bin/bash", "--login", "-c"]
-
-# Cleanup
-RUN apt-get clean && \
-    rm -rf /var/lib/apt/lists/* && \
-    conda clean -a -y
-
-# Expose port for Gradio app
+# Expõe a porta e define o comando padrão
 EXPOSE 7860
-
-# Set default command to bash
-CMD ["/bin/bash"]
+CMD ["python3", "app.py"]
